@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Helpers
 const generateAccessToken = (id) =>
   jwt.sign({ id }, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
 
@@ -11,15 +10,13 @@ const generateRefreshToken = (id) =>
 const setRefreshCookie = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: true,           // Always true in production
+    sameSite: 'none',       // Required for cross-domain cookies
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
 
-// @desc    Register a new user
-// @route   POST /api/auth/signup
-// @access  Public
+
 const signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -38,7 +35,6 @@ const signup = async (req, res) => {
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 
-    // Save refresh token to DB
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
 
@@ -58,7 +54,6 @@ const signup = async (req, res) => {
   } catch (error) {
     console.error('Signup error:', error);
 
-    // Handle Mongoose validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((e) => e.message);
       return res.status(400).json({ success: false, message: messages[0] });
@@ -68,9 +63,7 @@ const signup = async (req, res) => {
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
+
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -111,9 +104,7 @@ const login = async (req, res) => {
   }
 };
 
-// @desc    Refresh access token
-// @route   POST /api/auth/refresh
-// @access  Public (requires refreshToken cookie)
+
 const refresh = async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
@@ -144,15 +135,13 @@ const refresh = async (req, res) => {
   }
 };
 
-// @desc    Logout user
-// @route   POST /api/auth/logout
-// @access  Public
+
 const logout = async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
 
     if (token) {
-      // Clear refreshToken from DB
+      
       const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
       await User.findByIdAndUpdate(decoded.id, { refreshToken: '' });
     }
@@ -165,7 +154,7 @@ const logout = async (req, res) => {
 
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
-    // Still clear cookie even if token is invalid
+    
     res.clearCookie('refreshToken');
     res.json({ success: true, message: 'Logged out successfully' });
   }
